@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>砲管守衛者 - Barrel Defender</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="game-container">
+<canvas id="game"></canvas>
+<div id="aim-slider">
+  <div id="aim-track"></div>
+  <div id="aim-handle"></div>
+</div>
+<div id="bottom-bar">
+  <button id="lb-btn" onclick="showLeaderboard()">排行榜</button>
+  <button id="pause-btn" onclick="togglePause()">暫停</button>
+</div>
+</div>
+
+<div id="ui-overlay">
+  <div id="hud-wrap">
+    <div id="hud">
+      <div class="hud-card">
+        <span class="hud-lbl">砲台</span>
+        <span class="hud-val" id="hp">--</span>
+      </div>
+      <div class="hud-card">
+        <span class="hud-lbl">擊落</span>
+        <span class="hud-val" id="kills">0</span>
+      </div>
+      <div class="hud-card">
+        <span class="hud-lbl">時間</span>
+        <span class="hud-val"><span id="time">0</span>s</span>
+      </div>
+      <div class="hud-card">
+        <span class="hud-lbl">波次</span>
+        <span class="hud-val" id="wave">1</span>
+      </div>
+      <div class="hud-card" id="soldier-card" style="display:none">
+        <span class="hud-lbl">小兵</span>
+        <span class="hud-val" id="soldier-info"></span>
+      </div>
+    </div>
+    <div id="barrel-hp">
+      <span class="hp-cell"></span>
+      <span class="hp-cell"></span>
+      <span class="hp-cell"></span>
+      <span class="hp-cell"></span>
+      <span class="hp-cell"></span>
+    </div>
+  </div>
+</div>
+
+<div id="start-screen">
+  <h1>砲管守衛者</h1>
+  <div class="intro">
+    <div class="intro-section">
+      <div class="intro-title">操作</div>
+      <p>滑鼠/觸控/下方拖曳條瞄準，砲台自動開火</p>
+      <p>攔截導彈、飛艇炸彈，守護砲管！</p>
+    </div>
+    <div class="intro-section">
+      <div class="intro-title">勝敗條件</div>
+      <p>砲管 HP 歸零或砲台方塊全毀 = Game Over</p>
+      <p>撐越久分數越高，挑戰排行榜！</p>
+    </div>
+    <div class="intro-section">
+      <div class="intro-title">小兵支援</div>
+      <p>射擊空中降落傘 / 擊落飛艇 / 地面邊緣增援</p>
+      <div class="intro-soldiers">
+        <span class="s-tag s-repair">修理兵</span> 自動修復砲台方塊，修完待命
+        <span class="s-tag s-speed">加速兵</span> 駐留砲台，提升射擊速度
+        <span class="s-tag s-shotgun">散彈兵</span> 駐留砲台，增加散射子彈
+      </div>
+      <p>小兵越多效果越強！但會被導彈炸死</p>
+    </div>
+    <div class="intro-section">
+      <div class="intro-title">飛艇</div>
+      <p>每 60 秒出現，投下炸彈，打掉關鍵部位可擊落</p>
+      <p>擊落後墜地爆炸，生成大量小兵支援！</p>
+    </div>
+  </div>
+  <input type="text" id="player-name" placeholder="輸入暱稱..." maxlength="12">
+  <button onclick="startGame()">開始防禦</button>
+  <button onclick="showLeaderboard()" style="font-size:14px;padding:6px 20px;animation:none">排行榜</button>
+</div>
+
+<div id="game-over-screen">
+  <h1>砲管全毀</h1>
+  <p>你的砲管被徹底摧毀了…</p>
+  <p id="final-stats"></p>
+  <button onclick="startGame()">再次防禦</button>
+  <button onclick="showLeaderboard()">排行榜</button>
+</div>
+
+<div id="leaderboard-screen">
+  <h2>排行榜</h2>
+  <div id="lb-content"></div>
+  <button onclick="hideLeaderboard()">關閉</button>
+</div>
+
+<!-- 核心：設定 → 狀態 → 基礎系統 → 引擎 -->
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/core/audio.js"></script>
+<script src="js/core/canvas.js"></script>
+<script src="js/core/input.js"></script>
+<script src="js/core/engine.js"></script>
+
+<!-- 插件：依賴順序載入 -->
+<script src="js/plugins/background.js"></script>
+<script src="js/plugins/terrain.js"></script>
+<script src="js/plugins/turret.js"></script>
+<script src="js/plugins/bullet.js"></script>
+<script src="js/plugins/missile.js"></script>
+<script src="js/plugins/effects.js"></script>
+<script src="js/plugins/collision.js"></script>
+<script src="js/plugins/wave.js"></script>
+<script src="js/plugins/hud.js"></script>
+<script src="js/plugins/airdrop.js"></script>
+<script src="js/plugins/airship.js"></script>
+<script src="js/plugins/slider.js"></script>
+
+<!-- 入口：組裝並啟動 -->
+<script src="js/main.js"></script>
+</body>
+</html>

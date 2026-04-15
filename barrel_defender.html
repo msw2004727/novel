@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🔫 砲管守衛者 - Barrel Defender</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;overflow:hidden;touch-action:none;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;width:100vw}
+canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;cursor:crosshair}
+#ui-overlay{position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:10;display:flex;justify-content:center;padding:12px}
+#hud{color:#0f0;font-family:monospace;font-size:14px;text-shadow:0 0 6px #0f0;display:flex;gap:24px;background:rgba(0,0,0,0.5);padding:6px 16px;border:1px solid rgba(0,255,0,0.2);border-radius:4px}
+#game-over-screen{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:none;flex-direction:column;justify-content:center;align-items:center;z-index:20;gap:16px}
+#game-over-screen h1{font-family:monospace;font-size:36px;color:#f44;text-shadow:0 0 20px #f00;letter-spacing:4px}
+#game-over-screen p{color:#aaa;font-family:monospace;font-size:16px}
+#game-over-screen button,#start-screen button{pointer-events:all;font-family:monospace;font-size:18px;padding:10px 32px;cursor:pointer;margin-top:12px;transition:all .2s}
+#game-over-screen button{background:#222;color:#0f0;border:2px solid #0f0;text-shadow:0 0 4px #0f0}
+#game-over-screen button:hover{background:#0f0;color:#000}
+#start-screen{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:30;gap:12px}
+#start-screen h1{font-family:monospace;font-size:32px;color:#4a0;text-shadow:0 0 30px #4a0,0 0 60px #280;letter-spacing:3px}
+#start-screen .sub{color:#888;font-family:monospace;font-size:13px;max-width:420px;text-align:center;line-height:1.6}
+#start-screen button{background:transparent;color:#4a0;border:2px solid #4a0;text-shadow:0 0 6px #4a0;font-size:20px;padding:12px 40px;animation:pulse-btn 1.5s infinite}
+#start-screen button:hover{background:#4a0;color:#000}
+@keyframes pulse-btn{0%,100%{box-shadow:0 0 10px rgba(68,170,0,.3)}50%{box-shadow:0 0 25px rgba(68,170,0,.6)}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui-overlay">
+  <div id="hud">
+    <span>🧱 砲台 <span id="hp">--</span></span>
+    <span>💀 擊落 <span id="kills">0</span></span>
+    <span>⏱️ <span id="time">0</span>s</span>
+    <span>🌊 波次 <span id="wave">1</span></span>
+  </div>
+</div>
+<div id="start-screen">
+  <h1>🔫 砲管守衛者</h1>
+  <p class="sub">
+    用滑鼠/手指控制砲台方向，攔截拋物線導彈！<br>
+    砲台由方塊組成，會被炸毀崩塌。<br>
+    守護你的砲管！砲管全毀就 Game Over！
+  </p>
+  <button onclick="startGame()">▶ 開始防禦</button>
+</div>
+<div id="game-over-screen">
+  <h1>砲管全毀</h1>
+  <p>你的砲管被徹底摧毀了…</p>
+  <p id="final-stats"></p>
+  <button onclick="startGame()">🔄 再次防禦</button>
+</div>
+
+<script>
+const CFG = {
+  W: 800, H: 600,
+  TURRET_FIRE_RATE: 300,
+  BULLET_SPEED: 11,
+  BULLET_SIZE: 4,
+  // Missiles - all aim at center, parabolic
+  MISSILE_SPAWN_RATE_INIT: 1600,
+  MISSILE_SPAWN_RATE_MIN: 300,
+  MISSILE_GRAVITY: 0.025,
+  // Terrain
+  GROUND_Y: 410,
+  GROUND_DEPTH: 150,
+  TILE_SIZE: 8,
+  EXPLOSION_RADIUS: 32,
+  WAVE_DURATION: 20000,
+  // Turret block grid (75% of previous 100x60 → 75x45)
+  TB_SIZE: 8,       // block size matches terrain tile
+  TB_COLS: 10,      // 10 * 8 = 80px wide (was ~100)
+  TB_ROWS: 6,       // 6 * 8 = 48px tall (was ~60)
+};
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let scaleX, scaleY;
+function resizeCanvas() {
+  const a = CFG.W/CFG.H;
+  let w = window.innerWidth, h = window.innerHeight;
+  if (w/h > a) w = h*a; else h = w/a;
+  canvas.width=CFG.W; canvas.height=CFG.H;
+  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  scaleX=CFG.W/w; scaleY=CFG.H/h;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ===== AUDIO =====
+const AudioCtx = window.AudioContext||window.webkitAudioContext;
+let audioCtx;
+function initAudio(){if(!audioCtx) audioCtx=new AudioCtx()}
+function playSound(type){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  const t=audioCtx.currentTime;
+  if(type==='shoot'){o.type='square';o.frequency.setValueAtTime(800,t);o.frequency.exponentialRampToValueAtTime(200,t+.05);g.gain.setValueAtTime(.08,t);g.gain.exponentialRampToValueAtTime(.001,t+.06);o.start(t);o.stop(t+.06)}
+  else if(type==='explode'){o.type='sawtooth';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(30,t+.3);g.gain.setValueAtTime(.15,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);o.start(t);o.stop(t+.3)}
+  else if(type==='hit'){o.type='triangle';o.frequency.setValueAtTime(400,t);o.frequency.exponentialRampToValueAtTime(80,t+.15);g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);o.start(t);o.stop(t+.15)}
+  else if(type==='turret_hit'){o.type='square';o.frequency.setValueAtTime(300,t);o.frequency.exponentialRampToValueAtTime(60,t+.15);g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);o.start(t);o.stop(t+.15)}
+}
+
+// ===== STATE =====
+let gameState='menu';
+let mouseX=CFG.W/2, mouseY=0, turretAngle=-Math.PI/2;
+let bullets=[], missiles=[], particles=[], explosions=[];
+let terrain=[], turretBlocks=[];
+let kills=0, gameTime=0, lastFireTime=0, lastMissileTime=0;
+let wave=1, waveTimer=0;
+let shakeX=0, shakeY=0, shakeMag=0;
+let starField=[];
+
+// Turret origin (bottom-center of turret block grid, sits on ground)
+let turretX = CFG.W/2;
+let turretBaseY = CFG.GROUND_Y; // bottom of turret = top of ground
+
+// ===== TERRAIN =====
+const COLS = Math.ceil(CFG.W/CFG.TILE_SIZE);
+const ROWS = Math.ceil(CFG.GROUND_DEPTH/CFG.TILE_SIZE);
+
+function initTerrain(){
+  terrain=[];
+  for(let r=0;r<ROWS;r++){terrain[r]=[];for(let c=0;c<COLS;c++) terrain[r][c]=3;}
+}
+function getTerrainWorldY(r){return CFG.GROUND_Y+r*CFG.TILE_SIZE}
+
+function destroyTerrain(wx,wy,radius){
+  if(!terrain.length)return;
+  const r2=radius*radius;
+  for(let r=0;r<ROWS;r++){
+    if(!terrain[r])continue;
+    for(let c=0;c<COLS;c++){
+      if(terrain[r][c]<=0)continue;
+      const tx=c*CFG.TILE_SIZE+CFG.TILE_SIZE/2;
+      const ty=getTerrainWorldY(r)+CFG.TILE_SIZE/2;
+      const dx=tx-wx,dy=ty-wy,d2=dx*dx+dy*dy;
+      if(d2<r2){
+        const dmg=d2<r2*.3?3:d2<r2*.7?2:1;
+        terrain[r][c]=Math.max(0,terrain[r][c]-dmg);
+        if(terrain[r][c]<=0){
+          for(let i=0;i<3;i++) particles.push({x:tx,y:ty,vx:(Math.random()-.5)*4,vy:-Math.random()*3-1,life:30+Math.random()*20,maxLife:50,color:['#5a3a1a','#7a5a2a','#4a2a0a'][Math.floor(Math.random()*3)],size:2+Math.random()*2});
+        }
+      }
+    }
+  }
+}
+
+// ===== TURRET BLOCKS =====
+// Each block: { hp: 0-3, type: 'armor'|'barrel'|'dome'|'track' }
+// The turret is a grid of TB_COLS x TB_ROWS blocks
+// Layout blueprint (row 0 = top):
+//   Row 0:        ....BB....   (barrel mount)
+//   Row 1:       ...DDDD...   (dome)
+//   Row 2:       ..AAAAAA..   (upper armor)
+//   Row 3:       .AAAAAAAA.   (lower armor)
+//   Row 4:       AAAAAAAAAA   (hull)
+//   Row 5:       TTTTTTTTTT   (tracks)
+
+function initTurretBlocks(){
+  turretBlocks=[];
+  const C=CFG.TB_COLS, R=CFG.TB_ROWS;
+  for(let r=0;r<R;r++){
+    turretBlocks[r]=[];
+    for(let c=0;c<C;c++){
+      turretBlocks[r][c]={hp:0,type:'empty',color:''};
+    }
+  }
+  // Row 5 (bottom) - tracks
+  for(let c=0;c<C;c++) setTB(5,c,3,'track','#2a2a2a');
+  // Row 4 - hull
+  for(let c=0;c<C;c++) setTB(4,c,3,'armor','#3a4a3a');
+  // Row 3 - lower armor
+  for(let c=1;c<C-1;c++) setTB(3,c,3,'armor','#4a5a4a');
+  // Row 2 - upper armor
+  for(let c=2;c<C-2;c++) setTB(2,c,3,'armor','#4a5a3a');
+  // Row 1 - dome
+  for(let c=3;c<C-3;c++) setTB(1,c,3,'dome','#5a6a4a');
+  // Row 0 - barrel mount (center 2 blocks)
+  const mid=Math.floor(C/2);
+  setTB(0,mid-1,3,'barrel','#6a7a5a');
+  setTB(0,mid,3,'barrel','#6a7a5a');
+}
+
+function setTB(r,c,hp,type,color){
+  if(r>=0&&r<CFG.TB_ROWS&&c>=0&&c<CFG.TB_COLS)
+    turretBlocks[r][c]={hp,type,color};
+}
+
+function getTurretBlockWorld(r,c){
+  const tw=CFG.TB_COLS*CFG.TB_SIZE;
+  const th=CFG.TB_ROWS*CFG.TB_SIZE;
+  return {
+    x: turretX - tw/2 + c*CFG.TB_SIZE,
+    y: turretBaseY - th + r*CFG.TB_SIZE,
+  };
+}
+
+function destroyTurretBlocks(wx,wy,radius){
+  const r2=radius*radius;
+  let destroyed=false;
+  for(let r=0;r<CFG.TB_ROWS;r++){
+    if(!turretBlocks[r])continue;
+    for(let c=0;c<CFG.TB_COLS;c++){
+      const b=turretBlocks[r][c];
+      if(b.hp<=0)continue;
+      const pos=getTurretBlockWorld(r,c);
+      const bx=pos.x+CFG.TB_SIZE/2, by=pos.y+CFG.TB_SIZE/2;
+      const dx=bx-wx, dy=by-wy, d2=dx*dx+dy*dy;
+      if(d2<r2){
+        const dmg=d2<r2*.3?3:d2<r2*.6?2:1;
+        b.hp=Math.max(0,b.hp-dmg);
+        if(b.hp<=0){
+          destroyed=true;
+          for(let i=0;i<4;i++) particles.push({
+            x:bx,y:by,vx:(Math.random()-.5)*5,vy:-Math.random()*4-1,
+            life:25+Math.random()*20,maxLife:45,
+            color:b.type==='track'?'#333':b.type==='dome'?'#6a7a5a':'#4a5a3a',
+            size:2+Math.random()*3,
+          });
+        }
+      }
+    }
+  }
+  if(destroyed) playSound('turret_hit');
+  // Apply gravity to floating turret blocks
+  applyTurretGravity();
+}
+
+function applyTurretGravity(){
+  // From bottom-1 upward, if a block has nothing below it and it's not bottom row, it falls
+  // Simple: blocks without support below become rubble (hp=0)
+  for(let r=CFG.TB_ROWS-2;r>=0;r--){
+    for(let c=0;c<CFG.TB_COLS;c++){
+      const b=turretBlocks[r][c];
+      if(b.hp<=0)continue;
+      // check support: the block below, or any adjacent-below
+      let hasSupport=false;
+      // direct below
+      if(r+1<CFG.TB_ROWS && turretBlocks[r+1][c].hp>0) hasSupport=true;
+      // diagonal support
+      if(!hasSupport && r+1<CFG.TB_ROWS){
+        if(c>0 && turretBlocks[r+1][c-1].hp>0) hasSupport=true;
+        if(c<CFG.TB_COLS-1 && turretBlocks[r+1][c+1].hp>0) hasSupport=true;
+      }
+      // bottom row always supported by ground (if ground exists)
+      if(r===CFG.TB_ROWS-1) hasSupport=true;
+
+      if(!hasSupport){
+        // collapse this block
+        b.hp=0;
+        const pos=getTurretBlockWorld(r,c);
+        for(let i=0;i<3;i++) particles.push({
+          x:pos.x+CFG.TB_SIZE/2, y:pos.y+CFG.TB_SIZE/2,
+          vx:(Math.random()-.5)*3, vy:Math.random()*2+1,
+          life:20+Math.random()*15, maxLife:35,
+          color:'#5a5a4a', size:2+Math.random()*2,
+        });
+      }
+    }
+  }
+}
+
+function isBarrelAlive(){
+  const mid=Math.floor(CFG.TB_COLS/2);
+  return (turretBlocks[0] &&
+    (turretBlocks[0][mid-1].hp>0 || turretBlocks[0][mid].hp>0));
+}
+
+// ===== STARS =====
+function initStars(){
+  starField=[];
+  for(let i=0;i<80;i++) starField.push({x:Math.random()*CFG.W,y:Math.random()*(CFG.GROUND_Y-60),size:Math.random()<.3?2:1,blink:Math.random()*Math.PI*2,speed:.02+Math.random()*.03});
+}
+
+// ===== INPUT =====
+function getCanvasPos(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*scaleX,y:(e.clientY-r.top)*scaleY}}
+canvas.addEventListener('mousemove',e=>{const p=getCanvasPos(e);mouseX=p.x;mouseY=p.y});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();const p=getCanvasPos(e.touches[0]);mouseX=p.x;mouseY=p.y},{passive:false});
+canvas.addEventListener('touchstart',e=>{e.preventDefault();const p=getCanvasPos(e.touches[0]);mouseX=p.x;mouseY=p.y},{passive:false});
+
+// ===== GAME LOGIC =====
+function fireBullet(now){
+  if(now-lastFireTime<CFG.TURRET_FIRE_RATE)return;
+  if(!isBarrelAlive())return;
+  lastFireTime=now;
+
+  // barrel tip position
+  const mid=Math.floor(CFG.TB_COLS/2);
+  const bpos=getTurretBlockWorld(0,mid);
+  const originX=bpos.x;
+  const originY=bpos.y+CFG.TB_SIZE/2;
+
+  const dx=mouseX-originX, dy=mouseY-originY;
+  if(dx*dx+dy*dy<1)return;
+  const angle=Math.atan2(dy,dx);
+  turretAngle=angle;
+
+  const mDist=40;
+  const mx=originX+Math.cos(angle)*mDist;
+  const my=originY+Math.sin(angle)*mDist;
+
+  bullets.push({x:mx,y:my,vx:Math.cos(angle)*CFG.BULLET_SPEED,vy:Math.sin(angle)*CFG.BULLET_SPEED,life:80});
+  for(let i=0;i<5;i++){
+    const sp=(Math.random()-.5)*.4;
+    particles.push({x:mx,y:my,vx:Math.cos(angle+sp)*(3+Math.random()*3),vy:Math.sin(angle+sp)*(3+Math.random()*3),life:5+Math.random()*4,maxLife:9,color:i<3?'#ff0':'#fa0',size:2});
+  }
+  playSound('shoot');
+}
+
+function spawnMissile(now){
+  const rate=Math.max(CFG.MISSILE_SPAWN_RATE_MIN,CFG.MISSILE_SPAWN_RATE_INIT-(wave-1)*160);
+  if(now-lastMissileTime<rate)return;
+  lastMissileTime=now;
+
+  const count=wave>=4?(wave>=7?3:2):1;
+  for(let i=0;i<count;i++){
+    // Spawn from left or right edge, high up
+    const fromLeft=Math.random()<.5;
+    const sx=fromLeft? -10 : CFG.W+10;
+    const sy=20+Math.random()*80;
+
+    // Target: center ground area (very accurate)
+    const targetX=CFG.W/2 + (Math.random()-.5)*40;  // ±20px from center
+    const targetY=CFG.GROUND_Y;
+
+    // Calculate parabolic launch velocity
+    const dx=targetX-sx;
+    const dy=targetY-sy;
+    // Time to reach target (controls arc height)
+    const flightTime=90+Math.random()*40; // frames
+    // vx = dx/t, vy = (dy - 0.5*g*t^2)/t
+    const vx=dx/flightTime;
+    const vy=(dy - .5*CFG.MISSILE_GRAVITY*flightTime*flightTime)/flightTime;
+
+    missiles.push({
+      x:sx, y:sy,
+      vx: vx,
+      vy: vy,
+      alive:true,
+      trail:[],
+    });
+  }
+}
+
+function createExplosion(x,y){
+  explosions.push({x,y,radius:CFG.EXPLOSION_RADIUS,life:20,maxLife:20});
+  for(let i=0;i<24;i++){
+    const a=Math.random()*Math.PI*2, sp=1+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:20+Math.random()*30,maxLife:50,
+      color:['#f80','#f40','#fa0','#ff0'][Math.floor(Math.random()*4)],
+      size:2+Math.random()*3});
+  }
+  shakeMag=6;
+  destroyTerrain(x,y,CFG.EXPLOSION_RADIUS);
+  destroyTurretBlocks(x,y,CFG.EXPLOSION_RADIUS);
+  playSound('explode');
+}
+
+function checkBulletMissileCollision(){
+  for(let bi=bullets.length-1;bi>=0;bi--){
+    const b=bullets[bi];
+    for(let mi=missiles.length-1;mi>=0;mi--){
+      const m=missiles[mi];
+      if(!m.alive)continue;
+      const dx=b.x-m.x,dy=b.y-m.y;
+      if(dx*dx+dy*dy<14*14){
+        m.alive=false;b.life=0;kills++;
+        explosions.push({x:m.x,y:m.y,radius:20,life:15,maxLife:15});
+        for(let i=0;i<12;i++){
+          const a=Math.random()*Math.PI*2,sp=1+Math.random()*3;
+          particles.push({x:m.x,y:m.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:15+Math.random()*20,maxLife:35,color:['#f80','#fa0','#ff0'][Math.floor(Math.random()*3)],size:2+Math.random()*2});
+        }
+        shakeMag=3;
+        playSound('hit');break;
+      }
+    }
+  }
+}
+
+function checkMissileGround(){
+  for(let i=missiles.length-1;i>=0;i--){
+    const m=missiles[i];
+    if(!m.alive)continue;
+
+    // Check turret block collision
+    let hitTurret=false;
+    for(let r=0;r<CFG.TB_ROWS&&!hitTurret;r++){
+      if(!turretBlocks[r])continue;
+      for(let c=0;c<CFG.TB_COLS;c++){
+        if(turretBlocks[r][c].hp<=0)continue;
+        const pos=getTurretBlockWorld(r,c);
+        if(m.x>=pos.x&&m.x<=pos.x+CFG.TB_SIZE&&m.y>=pos.y&&m.y<=pos.y+CFG.TB_SIZE){
+          m.alive=false;
+          createExplosion(m.x,m.y);
+          hitTurret=true;break;
+        }
+      }
+    }
+    if(hitTurret){
+      if(!isBarrelAlive()) gameOver();
+      continue;
+    }
+
+    // Terrain collision
+    const col=Math.floor(m.x/CFG.TILE_SIZE);
+    if(col>=0&&col<COLS&&terrain.length){
+      for(let r=0;r<ROWS;r++){
+        if(!terrain[r])continue;
+        if(terrain[r][col]>0){
+          if(m.y>=getTerrainWorldY(r)){
+            m.alive=false;
+            createExplosion(m.x,m.y);
+            // Check if explosion killed barrel
+            if(!isBarrelAlive()) gameOver();
+            break;
+          }
+        }
+      }
+    }
+
+    // Off screen
+    if(m.alive&&m.y>CFG.H+40) m.alive=false;
+  }
+}
+
+function gameOver(){
+  gameState='gameover';
+  document.getElementById('game-over-screen').style.display='flex';
+  document.getElementById('final-stats').textContent=
+    `擊落 ${kills} 枚導彈 | 存活 ${Math.floor(gameTime/1000)} 秒 | 抵達波次 ${wave}`;
+}
+
+// ===== UPDATE =====
+let lastTime=0;
+function update(now){
+  if(gameState!=='playing')return;
+  const dt=now-lastTime;
+  lastTime=now;
+  gameTime+=dt;
+  waveTimer+=dt;
+  if(waveTimer>CFG.WAVE_DURATION){waveTimer=0;wave++}
+
+  fireBullet(now);
+  spawnMissile(now);
+
+  // Bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.x+=b.vx;b.y+=b.vy;b.life--;
+    if(b.life<=0||b.x<-20||b.x>CFG.W+20||b.y<-20||b.y>CFG.H+20) bullets.splice(i,1);
+  }
+
+  // Missiles - parabolic (gravity)
+  for(let i=missiles.length-1;i>=0;i--){
+    const m=missiles[i];
+    if(!m.alive){missiles.splice(i,1);continue}
+    m.vy+=CFG.MISSILE_GRAVITY; // gravity!
+    m.x+=m.vx;
+    m.y+=m.vy;
+    m.trail.push({x:m.x,y:m.y,life:18});
+    if(m.trail.length>18)m.trail.shift();
+    for(let t of m.trail)t.life--;
+    m.trail=m.trail.filter(t=>t.life>0);
+  }
+
+  checkBulletMissileCollision();
+  checkMissileGround();
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=.08;p.vx*=.98;p.life--;
+    if(p.life<=0)particles.splice(i,1);
+  }
+  for(let i=explosions.length-1;i>=0;i--){
+    explosions[i].life--;
+    if(explosions[i].life<=0)explosions.splice(i,1);
+  }
+
+  if(shakeMag>0){
+    shakeX=(Math.random()-.5)*shakeMag;
+    shakeY=(Math.random()-.5)*shakeMag;
+    shakeMag*=.85;
+    if(shakeMag<.5){shakeMag=0;shakeX=0;shakeY=0}
+  }
+
+  // HUD - count alive turret blocks
+  let aliveBlocks=0, totalBlocks=0;
+  for(let r=0;r<CFG.TB_ROWS;r++){if(!turretBlocks[r])continue;for(let c=0;c<CFG.TB_COLS;c++){if(turretBlocks[r][c].type!=='empty'){totalBlocks++;if(turretBlocks[r][c].hp>0)aliveBlocks++}}}
+  document.getElementById('hp').textContent=aliveBlocks+'/'+totalBlocks;
+  document.getElementById('kills').textContent=kills;
+  document.getElementById('time').textContent=Math.floor(gameTime/1000);
+  document.getElementById('wave').textContent=wave;
+}
+
+// ===== DRAW =====
+function draw(now){
+  ctx.save();
+  ctx.translate(shakeX,shakeY);
+  ctx.fillStyle='#080810';
+  ctx.fillRect(-10,-10,CFG.W+20,CFG.H+20);
+
+  // Stars
+  for(const s of starField){
+    s.blink+=s.speed;
+    ctx.fillStyle=`rgba(255,255,255,${.3+.7*Math.abs(Math.sin(s.blink))})`;
+    ctx.fillRect(Math.floor(s.x),Math.floor(s.y),s.size,s.size);
+  }
+
+  // City silhouette
+  ctx.fillStyle='#0c0c18';
+  for(let i=0;i<20;i++){
+    const bx=i*45-10, bh=30+Math.sin(i*1.7)*25+Math.cos(i*.8)*15;
+    ctx.fillRect(bx,CFG.GROUND_Y-bh,35,bh);
+  }
+
+  // Terrain
+  for(let r=0;r<ROWS;r++){
+    if(!terrain[r])continue;
+    for(let c=0;c<COLS;c++){
+      const hp=terrain[r][c];
+      if(hp<=0)continue;
+      const tx=c*CFG.TILE_SIZE,ty=getTerrainWorldY(r);
+      if(r===0){ctx.fillStyle=['#1a3a1a','#2a4a1a','#1a4a2a'][hp-1]||'#1a3a1a'}
+      else{const d=r/ROWS,br=hp/3;ctx.fillStyle=`rgb(${Math.floor((40+d*30)*br)},${Math.floor((25+d*15)*br)},${Math.floor(10*br)})`}
+      ctx.fillRect(tx,ty,CFG.TILE_SIZE,CFG.TILE_SIZE);
+      ctx.fillStyle='rgba(0,0,0,.15)';
+      ctx.fillRect(tx+CFG.TILE_SIZE-1,ty,1,CFG.TILE_SIZE);
+      ctx.fillRect(tx,ty+CFG.TILE_SIZE-1,CFG.TILE_SIZE,1);
+    }
+  }
+
+  // Turret blocks
+  drawTurretBlocks(now);
+
+  // Barrel (drawn if alive)
+  if(isBarrelAlive()) drawBarrel(now);
+
+  // Bullets
+  ctx.shadowColor='#ff0';ctx.shadowBlur=5;
+  for(const b of bullets){ctx.fillStyle='#ff0';ctx.fillRect(Math.floor(b.x)-2,Math.floor(b.y)-2,CFG.BULLET_SIZE,CFG.BULLET_SIZE)}
+  ctx.shadowBlur=0;
+
+  // Missile trails
+  for(const m of missiles){
+    if(!m.alive)continue;
+    for(const t of m.trail){
+      const a=t.life/18*.5;
+      ctx.fillStyle=`rgba(255,80,20,${a})`;
+      ctx.fillRect(Math.floor(t.x)-1,Math.floor(t.y)-1,3,3);
+    }
+  }
+
+  // Missiles
+  for(const m of missiles){
+    if(!m.alive)continue;
+    const a=Math.atan2(m.vy,m.vx);
+    ctx.save();ctx.translate(Math.floor(m.x),Math.floor(m.y));ctx.rotate(a);
+    // body
+    ctx.fillStyle='#c33';ctx.fillRect(-7,-3,14,6);
+    // nose
+    ctx.fillStyle='#f66';ctx.fillRect(6,-2,4,4);
+    // fins
+    ctx.fillStyle='#933';ctx.fillRect(-7,-5,3,2);ctx.fillRect(-7,3,3,2);
+    // engine
+    ctx.fillStyle='#fa0';ctx.fillRect(-9,-2,2,4);
+    ctx.restore();
+  }
+
+  // Explosions
+  for(const e of explosions){
+    const t=1-e.life/e.maxLife, r=e.radius*(.3+t*.7);
+    const g=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,r);
+    g.addColorStop(0,`rgba(255,200,50,${.6*(1-t)})`);
+    g.addColorStop(.4,`rgba(255,100,20,${.4*(1-t)})`);
+    g.addColorStop(1,'rgba(255,50,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(e.x,e.y,r,0,Math.PI*2);ctx.fill();
+    if(t<.3){ctx.fillStyle=`rgba(255,255,200,${.8*(1-t/.3)})`;ctx.beginPath();ctx.arc(e.x,e.y,r*.3,0,Math.PI*2);ctx.fill()}
+  }
+
+  // Particles
+  for(const p of particles){
+    ctx.globalAlpha=p.life/p.maxLife;
+    ctx.fillStyle=p.color;
+    ctx.fillRect(Math.floor(p.x),Math.floor(p.y),p.size,p.size);
+  }
+  ctx.globalAlpha=1;
+
+  // Crosshair
+  if(gameState==='playing'){
+    ctx.strokeStyle='rgba(0,255,0,.6)';ctx.lineWidth=1;
+    const cx2=Math.floor(mouseX),cy2=Math.floor(mouseY);
+    ctx.beginPath();
+    ctx.moveTo(cx2-10,cy2);ctx.lineTo(cx2-4,cy2);
+    ctx.moveTo(cx2+4,cy2);ctx.lineTo(cx2+10,cy2);
+    ctx.moveTo(cx2,cy2-10);ctx.lineTo(cx2,cy2-4);
+    ctx.moveTo(cx2,cy2+4);ctx.lineTo(cx2,cy2+10);
+    ctx.stroke();
+    ctx.fillStyle='rgba(0,255,0,.8)';ctx.fillRect(cx2,cy2,1,1);
+  }
+
+  // Warnings
+  // Barrel destroyed warning
+  if(!isBarrelAlive()&&gameState==='playing'){
+    ctx.fillStyle='rgba(255,0,0,.15)';ctx.fillRect(0,0,CFG.W,CFG.H);
+    ctx.fillStyle='#f44';ctx.font='bold 20px monospace';ctx.textAlign='center';
+    ctx.fillText('⚠ 砲管被摧毀！',CFG.W/2,80);
+  }
+
+  ctx.restore();
+}
+
+function drawTurretBlocks(now){
+  for(let r=0;r<CFG.TB_ROWS;r++){
+    if(!turretBlocks[r])continue;
+    for(let c=0;c<CFG.TB_COLS;c++){
+      const b=turretBlocks[r][c];
+      if(b.hp<=0)continue;
+      const pos=getTurretBlockWorld(r,c);
+      const S=CFG.TB_SIZE;
+
+      // Color based on HP (darker = more damaged)
+      const hpFactor=b.hp/3;
+      let baseR,baseG,baseB;
+      if(b.type==='track'){baseR=42;baseG=42;baseB=42}
+      else if(b.type==='dome'){baseR=90;baseG=106;baseB=74}
+      else if(b.type==='barrel'){baseR=106;baseG=122;baseB=90}
+      else{baseR=74;baseG=90;baseB=74} // armor
+
+      const cr=Math.floor(baseR*hpFactor);
+      const cg=Math.floor(baseG*hpFactor);
+      const cb=Math.floor(baseB*hpFactor);
+      ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
+      ctx.fillRect(pos.x,pos.y,S,S);
+
+      // Grid lines
+      ctx.fillStyle='rgba(0,0,0,.2)';
+      ctx.fillRect(pos.x+S-1,pos.y,1,S);
+      ctx.fillRect(pos.x,pos.y+S-1,S,1);
+
+      // Highlight for full HP
+      if(b.hp===3){
+        ctx.fillStyle='rgba(255,255,255,.08)';
+        ctx.fillRect(pos.x,pos.y,S,1);
+        ctx.fillRect(pos.x,pos.y,1,S);
+      }
+    }
+  }
+
+  // Status indicator on dome (if dome exists)
+  const mid=Math.floor(CFG.TB_COLS/2);
+  if(turretBlocks[1]&&turretBlocks[1][mid]&&turretBlocks[1][mid].hp>0){
+    const pos=getTurretBlockWorld(1,mid);
+    const alive=isBarrelAlive();
+    ctx.fillStyle=alive?'#0f0':'#f00';
+    ctx.shadowColor=alive?'#0f0':'#f00';ctx.shadowBlur=4;
+    ctx.fillRect(pos.x+2,pos.y+2,3,3);
+    ctx.shadowBlur=0;
+  }
+}
+
+function drawBarrel(now){
+  const mid=Math.floor(CFG.TB_COLS/2);
+  // Find barrel block position
+  const bpos=getTurretBlockWorld(0,mid);
+  const originX=bpos.x;
+  const originY=bpos.y+CFG.TB_SIZE/2;
+
+  const barrelLen=38;
+  const bx=originX+Math.cos(turretAngle)*barrelLen;
+  const by=originY+Math.sin(turretAngle)*barrelLen;
+
+  // Shadow
+  ctx.strokeStyle='#1a2a1a';ctx.lineWidth=8;
+  ctx.beginPath();ctx.moveTo(originX,originY+1);ctx.lineTo(bx,by+1);ctx.stroke();
+  // Main
+  ctx.strokeStyle='#5a6a4a';ctx.lineWidth=6;
+  ctx.beginPath();ctx.moveTo(originX,originY);ctx.lineTo(bx,by);ctx.stroke();
+  // Highlight
+  ctx.strokeStyle='#7a8a6a';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(originX,originY-1);ctx.lineTo(bx,by-1);ctx.stroke();
+
+  // Muzzle brake
+  const mx=originX+Math.cos(turretAngle)*(barrelLen+3);
+  const my=originY+Math.sin(turretAngle)*(barrelLen+3);
+  ctx.save();ctx.translate(mx,my);ctx.rotate(turretAngle);
+  ctx.fillStyle='#3a4a3a';ctx.fillRect(-3,-6,6,12);
+  ctx.restore();
+}
+
+// ===== LOOP =====
+function gameLoop(now){update(now);draw(now);requestAnimationFrame(gameLoop)}
+
+function startGame(){
+  initAudio();gameState='playing';
+  bullets=[];missiles=[];particles=[];explosions=[];
+  kills=0;gameTime=0;lastFireTime=0;lastMissileTime=0;
+  wave=1;waveTimer=0;shakeMag=0;shakeX=0;shakeY=0;
+  lastTime=performance.now();
+  turretX=CFG.W/2;turretBaseY=CFG.GROUND_Y;
+  initTerrain();initTurretBlocks();initStars();
+  document.getElementById('start-screen').style.display='none';
+  document.getElementById('game-over-screen').style.display='none';
+}
+
+initTerrain();initTurretBlocks();initStars();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
