@@ -34,8 +34,9 @@
 
   function createShip(fromLeft) {
     var dir = fromLeft ? 1 : -1;
-    var scale = 1 + Math.floor(Math.random() * 5); // 1x ~ 5x
+    var scale = 1 + Math.floor(Math.random() * 5);
     var bs = BS * scale;
+    var diff = G.getDifficultyBonus ? G.getDifficultyBonus() : 0;
 
     var blocks = [];
     for (var r = 0; r < ROWS; r++) {
@@ -46,7 +47,8 @@
           blocks[r][c] = { hp: 0, type: '.', color: '', crit: false };
         } else {
           var t = TYPES[ch];
-          blocks[r][c] = { hp: Math.ceil(t.hp * (1 + (scale - 1) * 0.5)), type: ch, color: t.color, crit: t.crit };
+          // HP 隨小兵數等比提升
+          blocks[r][c] = { hp: Math.ceil(t.hp * (1 + (scale - 1) * 0.5) * (1 + diff)), type: ch, color: t.color, crit: t.crit };
         }
       }
     }
@@ -65,7 +67,8 @@
       blocks: blocks,
       bombTimer: 0,
       bombsDropped: 0,
-      totalBombs: 5 + Math.floor(Math.random() * 11) + (scale - 1) * 3,
+      // 炸彈數隨小兵數等比提升
+      totalBombs: Math.ceil((5 + Math.floor(Math.random() * 11) + (scale - 1) * 3) * (1 + diff)),
       propPhase: 0,
     };
   }
@@ -100,8 +103,11 @@
       });
     }
 
-    // 生成 3~10 隨機小兵
-    var count = 3 + Math.floor(Math.random() * 8);
+    // 生成 3~10 隨機小兵（受上限控制）
+    var sc = G.countAliveSoldiers ? G.countAliveSoldiers() : { repair: 0, speed: 0, shotgun: 0 };
+    var curTotal = sc.repair + sc.speed + sc.shotgun;
+    var maxNew = Math.max(0, 100 - curTotal);
+    var count = Math.min(3 + Math.floor(Math.random() * 8), maxNew);
     var types = ['repair', 'speed', 'shotgun'];
     for (var j = 0; j < count; j++) {
       state.soldiers.push({

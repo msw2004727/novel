@@ -10,13 +10,16 @@
     update: function(dt) {
       var now = performance.now();
 
-      // 生成（飛艇在場時減半頻率）
+      // 生成（難度隨小兵數動態調整）
+      var diff = G.getDifficultyBonus ? G.getDifficultyBonus() : 0;
       var rate = Math.max(CFG.MISSILE_SPAWN_RATE_MIN, CFG.MISSILE_SPAWN_RATE_INIT - (state.wave - 1) * 100);
+      rate = rate / (1 + diff);  // 小兵越多，間隔越短
       if (state.airships && state.airships.length > 0) rate *= 2;
       if (now - state.lastMissileTime >= rate) {
         state.lastMissileTime = now;
 
         var count = state.wave >= 4 ? (state.wave >= 7 ? 3 : 2) : 1;
+        count = Math.ceil(count * (1 + diff));  // 小兵越多，每波越多
         for (var i = 0; i < count; i++) {
           // 隨機方位生成：左、右、上方三個方向
           var dir = Math.random();
@@ -39,7 +42,7 @@
           var errorRange = CFG.W * 0.2;
           var targetX = CFG.W / 2 + (Math.random() - 0.5) * errorRange;
           var targetY = CFG.GROUND_Y + (Math.random() - 0.5) * 40;
-          var flightTime = 120 + Math.random() * 65;
+          var flightTime = (120 + Math.random() * 65) / (1 + diff);  // 小兵越多飛越快
           var vx = (targetX - sx) / flightTime;
           var vy = (targetY - sy - 0.5 * CFG.MISSILE_GRAVITY * flightTime * flightTime) / flightTime;
 

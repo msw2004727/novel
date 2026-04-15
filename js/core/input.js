@@ -13,6 +13,18 @@
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
 
+    // 點擊畫布：暫停中則恢復遊戲
+    canvas.addEventListener('mousedown', function() {
+      if (state.gameState === 'paused' && window.togglePause) window.togglePause();
+    });
+    canvas.addEventListener('touchstart', function(e) {
+      if (state.gameState === 'paused' && window.togglePause) {
+        e.preventDefault();
+        window.togglePause();
+        return;
+      }
+    }, { passive: false });
+
     canvas.addEventListener('mousemove', function(e) {
       if (state.sliderDragging) return;
       var p = G.getCanvasPos(e);

@@ -91,6 +91,19 @@
     return { repair: r, speed: sp, shotgun: sh };
   };
 
+  // 小兵總數上限
+  var SOLDIER_CAP = 100;
+
+  function totalSoldierCount() {
+    var sc = G.countAliveSoldiers();
+    return sc.repair + sc.speed + sc.shotgun;
+  }
+
+  // 難度加成：每 10 個小兵 +10%（小兵死亡會降回）
+  G.getDifficultyBonus = function() {
+    return Math.floor(totalSoldierCount() / 10) * 0.1;
+  };
+
   function nextInterval() {
     return DROP_INTERVAL_MIN + Math.random() * (DROP_INTERVAL_MAX - DROP_INTERVAL_MIN);
   }
@@ -117,11 +130,11 @@
       var now = performance.now();
       var i, j, s, ad, pos, tb, col;
 
-      // === 地面增援 ===
+      // === 地面增援（受上限控制）===
       state.groundSoldierTimer += dt;
-      if (state.groundSoldierTimer >= 25000) {
+      if (state.groundSoldierTimer >= 25000 && totalSoldierCount() < SOLDIER_CAP) {
         state.groundSoldierTimer = Math.random() * -5000;
-        var gCount = 1 + Math.floor(Math.random() * 2);
+        var gCount = Math.min(1 + Math.floor(Math.random() * 2), SOLDIER_CAP - totalSoldierCount());
         for (var gi = 0; gi < gCount; gi++) {
           var gLeft = Math.random() < 0.5;
           state.soldiers.push({
@@ -139,7 +152,7 @@
       }
 
       // === 空投生成 ===
-      if (now - state.lastAirdropTime >= state.nextAirdropInterval) {
+      if (now - state.lastAirdropTime >= state.nextAirdropInterval && totalSoldierCount() < SOLDIER_CAP) {
         state.lastAirdropTime = now;
         state.nextAirdropInterval = nextInterval();
         state.airdrops.push({
@@ -159,7 +172,7 @@
         ad.y += ad.vy;
 
         if (ad.y >= CFG.GROUND_Y - 8) {
-          state.soldiers.push({
+          if (totalSoldierCount() < SOLDIER_CAP) state.soldiers.push({
             x: ad.x, y: CFG.GROUND_Y,
             type: ad.type,
             state: 'walking_to',
