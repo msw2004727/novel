@@ -89,7 +89,6 @@ canvas {
   font-family: monospace;
   font-size: clamp(13px, 3.5vw, 17px);
   color: #0f0;
-  text-shadow: 0 0 5px #0f0;
   line-height: 1.2;
 }
 
@@ -150,7 +149,6 @@ canvas {
   font-family: monospace;
   font-size: 36px;
   color: #f44;
-  text-shadow: 0 0 20px #f00;
   letter-spacing: 4px;
 }
 
@@ -177,7 +175,6 @@ canvas {
   font-family: monospace;
   font-size: 32px;
   color: #4a0;
-  text-shadow: 0 0 30px #4a0, 0 0 60px #280;
   letter-spacing: 3px;
 }
 
@@ -245,7 +242,6 @@ canvas {
   text-align: center;
   outline: none;
   width: 220px;
-  text-shadow: 0 0 4px #0f0;
 }
 
 #player-name::placeholder { color: #555; }
@@ -289,7 +285,6 @@ canvas {
   font-family: monospace;
   font-size: 24px;
   color: #0f0;
-  text-shadow: 0 0 10px #0f0;
   letter-spacing: 3px;
 }
 
@@ -330,7 +325,6 @@ canvas {
   background: #222;
   color: #0f0;
   border: 2px solid #0f0;
-  text-shadow: 0 0 4px #0f0;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -353,7 +347,6 @@ canvas {
   background: #222;
   color: #0f0;
   border: 2px solid #0f0;
-  text-shadow: 0 0 4px #0f0;
 }
 
 #game-over-screen button:hover {
@@ -365,7 +358,6 @@ canvas {
   background: transparent;
   color: #4a0;
   border: 2px solid #4a0;
-  text-shadow: 0 0 6px #4a0;
   font-size: 20px;
   padding: 12px 40px;
   animation: pulse-btn 1.5s infinite;

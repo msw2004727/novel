@@ -6,7 +6,7 @@
   var LS_SCORES = 'barrel_defender_scores';
 
   // === jsonbin.io 全域排行榜 ===
-  var BIN_ID = '';  // 填入 Bin ID 即啟用雲端排行榜
+  var BIN_ID = '69df2161856a68218936277f';
   var BIN_KEY = '$2a$10$WsneQUpBgEHrv6mb/Qoj4.CDbyyCNvdcV23VIg35yTEDVtNAD5ZPS';
   var BIN_URL = BIN_ID ? 'https://api.jsonbin.io/v3/b/' + BIN_ID : '';
 
