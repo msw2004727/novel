@@ -42,9 +42,14 @@
           var errorRange = CFG.W * 0.2;
           var targetX = CFG.W / 2 + (Math.random() - 0.5) * errorRange;
           var targetY = CFG.GROUND_Y + (Math.random() - 0.5) * 40;
-          var flightTime = (240 + Math.random() * 130) / (1 + diff);  // 基礎慢速，小兵越多飛越快
-          var vx = (targetX - sx) / flightTime;
-          var vy = (targetY - sy - 0.5 * CFG.MISSILE_GRAVITY * flightTime * flightTime) / flightTime;
+          // 飛行時間依距離自動調整，避免拋物線向上
+          var dx = targetX - sx, dy = targetY - sy;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          var flightTime = (dist * 0.6 + 60) / (1 + diff);
+          var vx = dx / flightTime;
+          var vy = (dy - 0.5 * CFG.MISSILE_GRAVITY * flightTime * flightTime) / flightTime;
+          // 確保初始方向朝下或平飛，不允許向上拋射
+          if (vy < 0) vy = 0.2 + Math.random() * 0.3;
 
           state.missiles.push({ x: sx, y: sy, vx: vx, vy: vy, alive: true, trail: [] });
         }

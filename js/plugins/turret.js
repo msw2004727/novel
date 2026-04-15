@@ -15,7 +15,12 @@
 
   G.isBarrelAlive = function() {
     if (state.barrelHP <= 0) return false;
-    // 砲管需要支撐結構：至少要有 1 個非 barrel/empty 的方塊存活
+    if (state.barrelFalling) return false;
+    return true;
+  };
+
+  // 檢查砲管是否失去支撐（車體全空）
+  function hasStructure() {
     var tb = state.turretBlocks;
     for (var r = 0; r < CFG.TB_ROWS; r++) {
       if (!tb[r]) continue;
@@ -25,7 +30,19 @@
       }
     }
     return false;
-  };
+  }
+
+  // 啟動砲管墜落
+  function startBarrelFall() {
+    if (state.barrelFalling) return;
+    state.barrelFalling = true;
+    var origin = G.getBarrelOrigin();
+    state.barrelFallX = origin.x;
+    state.barrelFallY = origin.y;
+    state.barrelFallVy = -1;
+    state.barrelFallAngle = state.turretAngle;
+    state.barrelFallSpin = (Math.random() - 0.5) * 0.08;
+  }
 
   // 砲管原點（含傾斜旋轉）
   G.getBarrelOrigin = function() {
@@ -243,6 +260,48 @@
 
     update: function(dt) {
       updatePhysics(dt);
+
+      // 檢查砲管是否失去支撐
+      if (state.barrelHP > 0 && !state.barrelFalling && !hasStructure()) {
+        startBarrelFall();
+      }
+
+      // 砲管墜落動畫
+      if (state.barrelFalling) {
+        state.barrelFallVy += 0.12;
+        state.barrelFallY += state.barrelFallVy;
+        state.barrelFallAngle += state.barrelFallSpin;
+
+        // 墜落中冒煙
+        if (Math.random() < 0.3) {
+          state.particles.push({
+            x: state.barrelFallX + (Math.random() - 0.5) * 10,
+            y: state.barrelFallY,
+            vx: (Math.random() - 0.5) * 1, vy: -Math.random() * 1,
+            life: 10 + Math.random() * 10, maxLife: 20,
+            color: '#555', size: 2 + Math.random(),
+          });
+        }
+
+        // 撞地
+        if (state.barrelFallY >= CFG.GROUND_Y - 5) {
+          // 落地粒子
+          for (var i = 0; i < 10; i++) {
+            var a = Math.random() * Math.PI * 2;
+            var sp = 1 + Math.random() * 3;
+            state.particles.push({
+              x: state.barrelFallX, y: CFG.GROUND_Y,
+              vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2,
+              life: 15 + Math.random() * 15, maxLife: 30,
+              color: ['#5a6a4a', '#3a4a3a', '#555'][Math.floor(Math.random() * 3)],
+              size: 2 + Math.random() * 2,
+            });
+          }
+          state.shakeMag = 4;
+          // 砲管落地 → barrelHP 歸零 → 觸發 gameOver
+          state.barrelHP = 0;
+        }
+      }
     },
 
     draw: function(ctx, now) {
@@ -302,8 +361,21 @@
 
       ctx.restore(); // 結束傾斜變換
 
-      // 砲管（使用已含傾斜的原點，獨立於車體傾斜繪製）
-      if (G.isBarrelAlive()) {
+      // 砲管：正常 or 墜落中
+      if (state.barrelFalling) {
+        // 墜落中的砲管
+        var fx = state.barrelFallX;
+        var fy = Math.min(state.barrelFallY, CFG.GROUND_Y - 5);
+        var fa = state.barrelFallAngle;
+        var fLen = 38;
+        var fbx = fx + Math.cos(fa) * fLen;
+        var fby = fy + Math.sin(fa) * fLen;
+
+        ctx.strokeStyle = '#3a4a3a'; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fbx, fby); ctx.stroke();
+        ctx.strokeStyle = '#5a6a4a'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fbx, fby); ctx.stroke();
+      } else if (G.isBarrelAlive()) {
         var origin = G.getBarrelOrigin();
         var barrelLen = 38;
         var angle = state.turretAngle;

@@ -20,6 +20,12 @@
     turretBaseY: CFG.GROUND_Y,
     turretTilt: 0,
     turretSinkY: 0,
+    barrelFalling: false,
+    barrelFallX: 0,
+    barrelFallY: 0,
+    barrelFallVy: 0,
+    barrelFallAngle: 0,
+    barrelFallSpin: 0,
     kills: 0,
     gameTime: 0,
     lastFireTime: 0,
@@ -61,6 +67,12 @@
     s.turretBaseY = CFG.GROUND_Y;
     s.turretTilt = 0;
     s.turretSinkY = 0;
+    s.barrelFalling = false;
+    s.barrelFallX = 0;
+    s.barrelFallY = 0;
+    s.barrelFallVy = 0;
+    s.barrelFallAngle = 0;
+    s.barrelFallSpin = 0;
     s.kills = 0;
     s.gameTime = 0;
     s.lastFireTime = 0;
