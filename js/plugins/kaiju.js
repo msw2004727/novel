@@ -10,42 +10,44 @@
   var FLAME_SPEED = 2;
   var ATTACK_RANGE = 280;
 
-  // 面朝右（從左進場用，從右進場鏡像）
+  // 面朝右的恐龍（密實填充，從左進場用，從右則鏡像）
+  // H=頭(弱點) M=嘴 E=眼 N=頸 S=背棘 B=身 A=手 T=尾 L=腿 F=腳
   var MAP = [
-    '......SS....',
-    '.....SSSS...',
-    '.....SHHHH..',
+    '........SSS.',
+    '.......SSSS.',
+    '......SBBBS.',
+    '.....EHHHHM.',
+    '.....HHHHHM.',
     '......HHHH..',
-    '......HHHHM.',
-    '.......HHH..',
-    '......NNN...',
-    '.....SNNN...',
+    '......NNNN..',
+    '.....SNNNN..',
     '....SSBBBB..',
+    '....SBBBBB..',
     '...SSBBBBB..',
-    '...SSBBBBBA.',
-    '..SSBBBBBBA.',
-    '...BBBBBBB..',
-    '..TTBBBBBB..',
-    '.TTTBBBB....',
-    '.TTTT.BB....',
-    '.TTT.LL.LL..',
-    '..TT.LL.LL..',
-    '......FF.FF.',
-    '............',
+    '...SBBBBBBA.',
+    '..SSBBBBBB..',
+    '..TBBBBBBB..',
+    '.TTTBBBBB...',
+    '.TTTTBBBB...',
+    'TTTTTLL.LL..',
+    '.TTTTLL.LL..',
+    '.TTT.FF.FF..',
+    '..T.........',
   ];
   var COLS = MAP[0].length;
   var ROWS = MAP.length;
 
   var TYPES = {
-    S: { hp: 3, color: '#2a5a2a', crit: false },
+    S: { hp: 3, color: '#2a5a2a' },
     H: { hp: 8, color: '#3a6a3a', crit: true },
-    M: { hp: 4, color: '#a33',    crit: false },
-    N: { hp: 4, color: '#3a5530', crit: false },
-    B: { hp: 5, color: '#4a6a3a', crit: false },
-    A: { hp: 3, color: '#3a5a30', crit: false },
-    T: { hp: 3, color: '#4a5a30', crit: false },
-    L: { hp: 5, color: '#3a4a2a', crit: false },
-    F: { hp: 4, color: '#2a3a20', crit: false },
+    E: { hp: 6, color: '#aa3',    crit: true },
+    M: { hp: 4, color: '#a33' },
+    N: { hp: 4, color: '#3a5530' },
+    B: { hp: 5, color: '#4a6a3a' },
+    A: { hp: 3, color: '#3a5a30' },
+    T: { hp: 3, color: '#4a5a30' },
+    L: { hp: 5, color: '#3a4a2a' },
+    F: { hp: 4, color: '#2a3a20' },
   };
 
   function createKaiju(fromLeft) {
@@ -62,7 +64,11 @@
           blocks[r][c] = { hp: 0, type: '.', color: '', crit: false };
         } else {
           var t = TYPES[ch];
-          blocks[r][c] = { hp: Math.ceil(t.hp * (1 + diff)), type: ch, color: t.color, crit: t.crit };
+          blocks[r][c] = {
+            hp: Math.ceil(t.hp * (1 + diff)),
+            type: ch, color: t.color,
+            crit: !!t.crit,
+          };
           if (ch === 'M') { mouthR = r; mouthC = c; }
         }
       }
@@ -78,6 +84,7 @@
       mouthC: mouthC,
       state: 'walking',
       fireTimer: 0,
+      walkPhase: 0,
       debris: [],
       dyingTimer: 0,
     };
@@ -168,7 +175,6 @@
       for (i = state.kaijus.length - 1; i >= 0; i--) {
         k = state.kaijus[i];
 
-        // === 崩塌中 ===
         if (k.state === 'dying') {
           k.dyingTimer--;
           for (var di = k.debris.length - 1; di >= 0; di--) {
@@ -192,18 +198,19 @@
           continue;
         }
 
-        // === 行走 ===
+        // 走路動畫相位
+        k.walkPhase += dt * 0.004;
+
         var distToTurret = Math.abs((k.x + COLS * BS / 2) - state.turretX);
         if (k.state === 'walking') {
           k.x += k.dir * WALK_SPEED;
           if (distToTurret < ATTACK_RANGE) k.state = 'attacking';
-          // 走出畫面
           if ((k.dir > 0 && k.x > CFG.W + 20) || (k.dir < 0 && k.x < -COLS * BS - 20)) {
             state.kaijus.splice(i, 1); continue;
           }
         }
 
-        // === 攻擊（吐火）===
+        // 吐火
         if (k.state === 'attacking' || k.state === 'walking') {
           k.fireTimer += dt;
           if (k.fireTimer >= FIRE_INTERVAL && k.mouthR >= 0) {
@@ -217,11 +224,9 @@
               x: fx, y: fy,
               vx: dirToTurret * FLAME_SPEED,
               vy: (Math.random() - 0.5) * 0.3,
-              alive: true, trail: [],
-              type: 'flame',
+              alive: true, trail: [], type: 'flame',
             });
 
-            // 吐火粒子
             for (var fi = 0; fi < 6; fi++) {
               state.particles.push({
                 x: fx, y: fy,
@@ -238,66 +243,76 @@
     },
 
     draw: function(ctx) {
-      var i, k, r, c, blk, pos, d;
+      for (var i = 0; i < state.kaijus.length; i++) {
+        var k = state.kaijus[i];
 
-      for (i = 0; i < state.kaijus.length; i++) {
-        k = state.kaijus[i];
-
-        // 方塊
         if (k.state !== 'dying') {
-          for (r = 0; r < ROWS; r++) {
-            for (c = 0; c < COLS; c++) {
-              blk = k.blocks[r][c];
+          // 走路搖擺：身體上下 + 腿交替偏移
+          var bobY = Math.sin(k.walkPhase * 2) * 2;
+          var legCycle = Math.sin(k.walkPhase * 4);
+          var isWalking = k.state === 'walking';
+
+          for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+              var blk = k.blocks[r][c];
               if (blk.hp <= 0) continue;
-              pos = blockWorld(k, r, c);
-              var maxHp = TYPES[blk.type] ? TYPES[blk.type].hp : 1;
-              var hf = blk.hp / Math.ceil(maxHp * (1 + (G.getDifficultyBonus ? G.getDifficultyBonus() : 0)));
-              hf = Math.min(1, Math.max(0.3, hf));
+              var pos = blockWorld(k, r, c);
+              var drawX = pos.x;
+              var drawY = pos.y;
 
+              // 走路動畫偏移
+              if (isWalking) {
+                var ch = MAP[r][c];
+                if (ch === 'L' || ch === 'F') {
+                  // 腿部：左右腿交替上下
+                  var isLeftLeg = c < COLS / 2;
+                  drawY += (isLeftLeg ? legCycle : -legCycle) * 2;
+                } else {
+                  // 身體搖擺
+                  drawY += bobY;
+                }
+              }
+
+              // 繪製方塊
               ctx.fillStyle = blk.color;
-              ctx.globalAlpha = 0.4 + 0.6 * hf;
-              ctx.fillRect(pos.x, pos.y, BS, BS);
+              ctx.globalAlpha = blk.hp > 0 ? 0.5 + 0.5 * Math.min(1, blk.hp / 5) : 0;
+              ctx.fillRect(drawX, drawY, BS, BS);
 
-              ctx.globalAlpha = 0.15;
+              // 格線
+              ctx.globalAlpha = 0.12;
               ctx.fillStyle = '#000';
-              ctx.fillRect(pos.x + BS - 1, pos.y, 1, BS);
-              ctx.fillRect(pos.x, pos.y + BS - 1, BS, 1);
+              ctx.fillRect(drawX + BS - 1, drawY, 1, BS);
+              ctx.fillRect(drawX, drawY + BS - 1, BS, 1);
               ctx.globalAlpha = 1;
 
-              // 頭部弱點紅色高亮
+              // 頭部紅色脈動
               if (blk.crit) {
-                ctx.fillStyle = 'rgba(255,50,50,0.12)';
-                ctx.fillRect(pos.x, pos.y, BS, BS);
+                var pulse = 0.08 + Math.sin(k.walkPhase * 3) * 0.04;
+                ctx.fillStyle = 'rgba(255,50,50,' + pulse + ')';
+                ctx.fillRect(drawX, drawY, BS, BS);
+              }
+
+              // 眼睛
+              if (blk.type === 'E') {
+                ctx.fillStyle = '#ff0';
+                ctx.fillRect(drawX + 2, drawY + 2, 4, 4);
+                ctx.fillStyle = '#f00';
+                ctx.fillRect(drawX + 4, drawY + 3, 2, 2);
               }
 
               // 嘴巴發光
               if (blk.type === 'M') {
-                ctx.fillStyle = 'rgba(255,100,0,0.25)';
-                ctx.fillRect(pos.x, pos.y, BS, BS);
+                var mGlow = 0.15 + Math.sin(k.fireTimer / FIRE_INTERVAL * Math.PI * 2) * 0.1;
+                ctx.fillStyle = 'rgba(255,100,0,' + mGlow + ')';
+                ctx.fillRect(drawX, drawY, BS, BS);
               }
             }
-          }
-
-          // 眼睛
-          for (r = 0; r < ROWS; r++) {
-            for (c = 0; c < COLS; c++) {
-              if (MAP[r][c] === 'H' && k.blocks[r][c].hp > 0) {
-                // 找頭部最上排的第二格作為眼睛
-                if (MAP[r - 1] && MAP[r - 1][c] === 'S') {
-                  pos = blockWorld(k, r, c);
-                  ctx.fillStyle = '#ff0';
-                  ctx.fillRect(pos.x + 3, pos.y + 3, 3, 3);
-                  break;
-                }
-              }
-            }
-            if (pos) break;
           }
         }
 
         // 崩塌碎塊
         for (var di = 0; di < k.debris.length; di++) {
-          d = k.debris[di];
+          var d = k.debris[di];
           ctx.fillStyle = d.color;
           ctx.globalAlpha = 0.8;
           ctx.fillRect(Math.floor(d.x), Math.floor(d.y), BS, BS);

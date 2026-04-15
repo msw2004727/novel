@@ -9,7 +9,7 @@
   var BOMB_INTERVAL = 900;
 
   // 飛艇方塊配置圖
-  // B=氣囊(hp1) H=骨架(hp2) G=吊艙(hp2) C=駕駛艙(hp6,關鍵) E=引擎(hp6,關鍵) F=燃料艙(hp4,關鍵)
+  // B=氣囊 H=骨架 G=吊艙 C=駕駛艙(要害) P=螺旋槳(要害) F=燃料艙(要害)
   var MAP = [
     '......BBBBBBBB......',
     '....BBBBBBBBBBBB....',
@@ -17,8 +17,8 @@
     '..BBBBBBBBBBBBBBBB..',
     '....BBBBBBBBBBBB....',
     '......HHHHHHHH......',
-    '.....CGGFGGGGE......',
-    '......GGGGGGGG......',
+    'P....CGGFGGGGGG...PP',
+    '.....GGGGGGGGGG.....',
   ];
   var COLS = MAP[0].length;
   var ROWS = MAP.length;
@@ -28,7 +28,7 @@
     H: { hp: 2, color: '#556', crit: false },
     G: { hp: 2, color: '#654', crit: false },
     C: { hp: 6, color: '#48c', crit: true },
-    E: { hp: 6, color: '#c44', crit: true },
+    P: { hp: 4, color: '#aaa', crit: true },
     F: { hp: 4, color: '#ca4', crit: true },
   };
 
@@ -270,16 +270,20 @@
           }
         }
 
-        // 螺旋槳（引擎位置）
+        // 螺旋槳動畫（P 方塊位置，旋轉葉片）
         if (!ship.falling) {
-          // 找引擎位置
-          for (var c = 0; c < COLS; c++) {
-            if (MAP[6][c] === 'E') {
-              var ep = blockWorld(ship, 6, c);
-              var propLen = (3 + Math.sin(ship.propPhase) * 3) * ship.scale;
-              ctx.fillStyle = '#aaa';
-              ctx.fillRect(ep.x + (ship.dir > 0 ? ship.bs : -4), ep.y - propLen, 2 * ship.scale, propLen * 2 + ship.bs);
-              break;
+          for (var pc = 0; pc < COLS; pc++) {
+            for (var pr = 0; pr < ROWS; pr++) {
+              if (MAP[pr][pc] !== 'P' || ship.blocks[pr][pc].hp <= 0) continue;
+              var pp = blockWorld(ship, pr, pc);
+              var pLen = (3 + Math.sin(ship.propPhase) * 3) * ship.scale;
+              ctx.fillStyle = '#ccc';
+              ctx.fillRect(pp.x + ship.bs / 2 - 1, pp.y - pLen, 2 * ship.scale, pLen * 2 + ship.bs);
+              // 旋轉效果
+              var pLen2 = (3 + Math.cos(ship.propPhase) * 3) * ship.scale;
+              ctx.globalAlpha = 0.5;
+              ctx.fillRect(pp.x - pLen2 + ship.bs / 2, pp.y + ship.bs / 2 - 1, pLen2 * 2, 2 * ship.scale);
+              ctx.globalAlpha = 1;
             }
           }
         }

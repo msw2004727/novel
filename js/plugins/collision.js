@@ -86,6 +86,8 @@
           b.life = 0; state.kills++; G.playSound('hit');
         } else if (b.life > 0 && G.checkKaijuHit && G.checkKaijuHit(b.x, b.y)) {
           b.life = 0; state.kills++; G.playSound('hit');
+        } else if (b.life > 0 && G.checkFighterHit && G.checkFighterHit(b.x, b.y)) {
+          b.life = 0; state.kills++; G.playSound('hit');
         }
       }
 
