@@ -10,8 +10,9 @@
     update: function(dt) {
       var now = performance.now();
 
-      // 生成
+      // 生成（飛艇在場時減半頻率）
       var rate = Math.max(CFG.MISSILE_SPAWN_RATE_MIN, CFG.MISSILE_SPAWN_RATE_INIT - (state.wave - 1) * 100);
+      if (state.airships && state.airships.length > 0) rate *= 2;
       if (now - state.lastMissileTime >= rate) {
         state.lastMissileTime = now;
 

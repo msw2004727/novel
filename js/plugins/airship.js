@@ -6,7 +6,7 @@
   var INTERVAL = 60000;
   var SPEED = 0.3;
   var BS = 4;          // block size
-  var BOMB_INTERVAL = 600;
+  var BOMB_INTERVAL = 900;
 
   // 飛艇方塊配置圖
   // B=氣囊(hp1) H=骨架(hp2) G=吊艙(hp2) C=駕駛艙(hp6,關鍵) E=引擎(hp6,關鍵) F=燃料艙(hp4,關鍵)
