@@ -14,7 +14,17 @@
   };
 
   G.isBarrelAlive = function() {
-    return state.barrelHP > 0;
+    if (state.barrelHP <= 0) return false;
+    // 砲管需要支撐結構：至少要有 1 個非 barrel/empty 的方塊存活
+    var tb = state.turretBlocks;
+    for (var r = 0; r < CFG.TB_ROWS; r++) {
+      if (!tb[r]) continue;
+      for (var c = 0; c < CFG.TB_COLS; c++) {
+        var b = tb[r][c];
+        if (b.type !== 'empty' && b.type !== 'barrel' && b.hp > 0) return true;
+      }
+    }
+    return false;
   };
 
   // 砲管原點（含傾斜旋轉）
