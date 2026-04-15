@@ -227,6 +227,7 @@
             if (s.type === 'repair') {
               s.repairTarget = findRepairTarget();
               if (s.repairTarget) { s.state = 'repairing'; s.repairTimer = 0; }
+              else if (state.barrelHP < CFG.BARREL_MAX_HP) { s.state = 'repairing_barrel'; s.repairTimer = 0; }
               else { s.state = 'idle'; }
             } else {
               s.state = 'boosting';
@@ -307,18 +308,22 @@
             }
 
             s.repairTarget = findRepairTarget();
-            if (s.repairTarget) { s.repairTimer = 0; }
-            else { s.state = 'idle'; }
+            if (s.repairTarget) {
+              s.repairTimer = 0;
+            } else if (state.barrelHP < CFG.BARREL_MAX_HP) {
+              s.state = 'repairing_barrel';
+              s.repairTimer = 0;
+            } else {
+              s.state = 'idle';
+            }
           }
         }
 
-        // --- 待命（修理完或無事可做）---
+        // --- 待命（偵測新損壞或砲管需修）---
         else if (s.state === 'idle') {
           if (s.type === 'repair') {
-            // 優先修方塊
             s.repairTarget = findRepairTarget();
             if (s.repairTarget) { s.state = 'repairing'; s.repairTimer = 0; }
-            // 方塊都好了就修砲管 HP
             else if (state.barrelHP < CFG.BARREL_MAX_HP) {
               s.state = 'repairing_barrel';
               s.repairTimer = 0;
