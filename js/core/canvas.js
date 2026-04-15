@@ -20,7 +20,7 @@
     state.scaleY = CFG.H / h;
 
     var slider = document.getElementById('aim-slider');
-    if (slider) slider.style.width = w + 'px';
+    if (slider) slider.style.width = Math.floor(w * 0.75) + 'px';
   }
 
   G.initCanvas = function() {
