@@ -41,7 +41,17 @@
           if (c > 0 && tb[r + 1][c - 1].hp > 0) hasSupport = true;
           if (c < CFG.TB_COLS - 1 && tb[r + 1][c + 1].hp > 0) hasSupport = true;
         }
-        if (r === CFG.TB_ROWS - 1) hasSupport = true;
+        // 最底排：檢查地形是否還在下方支撐
+        if (r === CFG.TB_ROWS - 1) {
+          hasSupport = false;
+          var tw = CFG.TB_COLS * CFG.TB_SIZE;
+          var worldX = state.turretX - tw / 2 + c * CFG.TB_SIZE + CFG.TB_SIZE / 2;
+          var terrainCol = Math.floor(worldX / CFG.TILE_SIZE);
+          if (terrainCol >= 0 && terrainCol < G.TERRAIN_COLS &&
+              state.terrain[0] && state.terrain[0][terrainCol] > 0) {
+            hasSupport = true;
+          }
+        }
 
         if (!hasSupport) {
           b.hp = 0;
