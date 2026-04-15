@@ -42,7 +42,7 @@
           var errorRange = CFG.W * 0.2;
           var targetX = CFG.W / 2 + (Math.random() - 0.5) * errorRange;
           var targetY = CFG.GROUND_Y + (Math.random() - 0.5) * 40;
-          var flightTime = (120 + Math.random() * 65) / (1 + diff);  // 小兵越多飛越快
+          var flightTime = (240 + Math.random() * 130) / (1 + diff);  // 基礎慢速，小兵越多飛越快
           var vx = (targetX - sx) / flightTime;
           var vy = (targetY - sy - 0.5 * CFG.MISSILE_GRAVITY * flightTime * flightTime) / flightTime;
 
