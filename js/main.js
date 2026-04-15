@@ -38,6 +38,7 @@
     G.plugins.effects,
     G.plugins.hud,
     G.plugins.airdrop,
+    G.plugins.filler,
     G.plugins.airship,
     G.plugins.fighter,
     G.plugins.kaiju,
