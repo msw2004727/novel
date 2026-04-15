@@ -23,7 +23,7 @@
           var diff = targetAngle - state.turretAngle;
           while (diff > Math.PI) diff -= Math.PI * 2;
           while (diff < -Math.PI) diff += Math.PI * 2;
-          var t = 1 - Math.exp(-12 * dt / 1000);
+          var t = 1 - Math.exp(-15 * dt / 1000);
           state.turretAngle += diff * t;
         }
       }

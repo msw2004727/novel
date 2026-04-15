@@ -13,7 +13,7 @@
     // ratio → 角度：0=左(-PI), 0.5=上(-PI/2), 1=右(0)
     var angle = -Math.PI + ratio * Math.PI;
     var origin = G.getBarrelOrigin();
-    var dist = 200;
+    var dist = 150;
     state.mouseX = origin.x + Math.cos(angle) * dist;
     state.mouseY = origin.y + Math.sin(angle) * dist;
   }
