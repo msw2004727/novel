@@ -18,6 +18,8 @@
     turretBlocks: [],
     turretX: CFG.W / 2,
     turretBaseY: CFG.GROUND_Y,
+    turretTilt: 0,
+    turretSinkY: 0,
     kills: 0,
     gameTime: 0,
     lastFireTime: 0,
@@ -57,6 +59,8 @@
     s.turretBlocks = [];
     s.turretX = CFG.W / 2;
     s.turretBaseY = CFG.GROUND_Y;
+    s.turretTilt = 0;
+    s.turretSinkY = 0;
     s.kills = 0;
     s.gameTime = 0;
     s.lastFireTime = 0;

@@ -3,12 +3,13 @@
   var CFG = G.CFG;
   var state = G.state;
 
+  // 未旋轉的格位座標（碰撞用）
   G.getTurretBlockWorld = function(r, c) {
     var tw = CFG.TB_COLS * CFG.TB_SIZE;
     var th = CFG.TB_ROWS * CFG.TB_SIZE;
     return {
       x: state.turretX - tw / 2 + c * CFG.TB_SIZE,
-      y: state.turretBaseY - th + r * CFG.TB_SIZE,
+      y: state.turretBaseY + state.turretSinkY - th + r * CFG.TB_SIZE,
     };
   };
 
@@ -16,10 +17,19 @@
     return state.barrelHP > 0;
   };
 
+  // 砲管原點（含傾斜旋轉）
   G.getBarrelOrigin = function() {
     var mid = Math.floor(CFG.TB_COLS / 2);
     var bpos = G.getTurretBlockWorld(0, mid);
-    return { x: bpos.x, y: bpos.y + CFG.TB_SIZE / 2 };
+    var px = state.turretX;
+    var py = state.turretBaseY + state.turretSinkY;
+    var dx = bpos.x - px, dy = bpos.y - py;
+    var cos = Math.cos(state.turretTilt);
+    var sin = Math.sin(state.turretTilt);
+    return {
+      x: px + dx * cos - dy * sin,
+      y: py + dx * sin + dy * cos,
+    };
   };
 
   function setBlock(r, c, hp, type, color) {
@@ -41,7 +51,6 @@
           if (c > 0 && tb[r + 1][c - 1].hp > 0) hasSupport = true;
           if (c < CFG.TB_COLS - 1 && tb[r + 1][c + 1].hp > 0) hasSupport = true;
         }
-        // 最底排：檢查地形是否還在下方支撐
         if (r === CFG.TB_ROWS - 1) {
           hasSupport = false;
           var tw = CFG.TB_COLS * CFG.TB_SIZE;
@@ -67,6 +76,48 @@
         }
       }
     }
+  }
+
+  // 計算地基支撐 → 傾斜 & 下沉
+  function updatePhysics(dt) {
+    var tb = state.turretBlocks;
+    var midCol = CFG.TB_COLS / 2;
+    var supportL = 0, supportR = 0, totalCols = 0;
+
+    for (var c = 0; c < CFG.TB_COLS; c++) {
+      if (tb[CFG.TB_ROWS - 1][c].hp <= 0 && tb[CFG.TB_ROWS - 1][c].type === 'empty') continue;
+      totalCols++;
+
+      var tw = CFG.TB_COLS * CFG.TB_SIZE;
+      var worldX = state.turretX - tw / 2 + c * CFG.TB_SIZE + CFG.TB_SIZE / 2;
+      var terrainCol = Math.floor(worldX / CFG.TILE_SIZE);
+      var supported = terrainCol >= 0 && terrainCol < G.TERRAIN_COLS &&
+                      state.terrain[0] && state.terrain[0][terrainCol] > 0;
+
+      if (supported) {
+        if (c < midCol) supportL++;
+        else supportR++;
+      }
+    }
+
+    var totalSupport = supportL + supportR;
+    var targetTilt = 0;
+    var targetSink = 0;
+
+    if (totalCols > 0 && totalSupport > 0) {
+      // 左右不均 → 傾斜（正=右傾，負=左傾）
+      var imbalance = (supportR - supportL) / Math.max(1, totalSupport);
+      targetTilt = -imbalance * 0.18;
+
+      // 缺少支撐 → 下沉
+      var missingRatio = 1 - totalSupport / totalCols;
+      targetSink = missingRatio * 24;
+    }
+
+    // 平滑過渡
+    var speed = 1 - Math.exp(-4 * dt / 1000);
+    state.turretTilt += (targetTilt - state.turretTilt) * speed;
+    state.turretSinkY += (targetSink - state.turretSinkY) * speed;
   }
 
   G.destroyTurretBlocks = function(wx, wy, radius) {
@@ -105,7 +156,6 @@
       }
     }
 
-    // 砲管受損：每次爆炸波及砲管方塊扣 1 HP
     var barrelHit = false;
     for (var r2b = 0; r2b < CFG.TB_ROWS; r2b++) {
       if (!state.turretBlocks[r2b]) continue;
@@ -161,6 +211,8 @@
     init: function() {
       var C = CFG.TB_COLS, R = CFG.TB_ROWS;
       state.turretBlocks = [];
+      state.turretTilt = 0;
+      state.turretSinkY = 0;
 
       for (var r = 0; r < R; r++) {
         state.turretBlocks[r] = [];
@@ -179,9 +231,22 @@
       setBlock(0, mid, 3, 'barrel', '#6a7a5a');
     },
 
+    update: function(dt) {
+      updatePhysics(dt);
+    },
+
     draw: function(ctx, now) {
       var tb = state.turretBlocks;
+      var px = state.turretX;
+      var py = state.turretBaseY + state.turretSinkY;
 
+      // 整體傾斜變換
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(state.turretTilt);
+      ctx.translate(-px, -py);
+
+      // 方塊
       for (var r = 0; r < CFG.TB_ROWS; r++) {
         if (!tb[r]) continue;
         for (var c = 0; c < CFG.TB_COLS; c++) {
@@ -225,7 +290,9 @@
         ctx.shadowBlur = 0;
       }
 
-      // 砲管
+      ctx.restore(); // 結束傾斜變換
+
+      // 砲管（使用已含傾斜的原點，獨立於車體傾斜繪製）
       if (G.isBarrelAlive()) {
         var origin = G.getBarrelOrigin();
         var barrelLen = 38;
