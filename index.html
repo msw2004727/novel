@@ -83,9 +83,11 @@
       <p>擊落後墜地爆炸，生成大量小兵支援！</p>
     </div>
   </div>
-  <input type="text" id="player-name" placeholder="輸入暱稱..." maxlength="12">
+  <div id="name-row">
+    <input type="text" id="player-name" placeholder="輸入暱稱..." maxlength="12">
+    <button onclick="showLeaderboard()" class="lb-side-btn">排行榜</button>
+  </div>
   <button onclick="startGame()">開始防禦</button>
-  <button onclick="showLeaderboard()" style="font-size:14px;padding:6px 20px;animation:none">排行榜</button>
 </div>
 
 <div id="game-over-screen">

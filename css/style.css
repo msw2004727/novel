@@ -247,6 +247,28 @@ canvas {
 #player-name::placeholder { color: #555; }
 #player-name:focus { border-color: #0f0; box-shadow: 0 0 10px rgba(0, 255, 0, 0.3); }
 
+#name-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.lb-side-btn {
+  font-family: monospace;
+  font-size: 13px !important;
+  padding: 0 14px !important;
+  background: rgba(0, 0, 0, 0.5);
+  color: #4a0;
+  border: 2px solid #4a0;
+  border-radius: 4px;
+  cursor: pointer;
+  animation: none !important;
+  white-space: nowrap;
+  margin: 0 !important;
+}
+
+.lb-side-btn:hover { background: #4a0; color: #000; }
+
 /* === Bottom Bar (below slider) === */
 #bottom-bar {
   display: flex;
