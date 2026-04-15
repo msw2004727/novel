@@ -314,10 +314,46 @@
 
         // --- 待命（修理完或無事可做）---
         else if (s.state === 'idle') {
-          // 修理兵：持續偵測是否有新損壞
           if (s.type === 'repair') {
+            // 優先修方塊
             s.repairTarget = findRepairTarget();
             if (s.repairTarget) { s.state = 'repairing'; s.repairTimer = 0; }
+            // 方塊都好了就修砲管 HP
+            else if (state.barrelHP < CFG.BARREL_MAX_HP) {
+              s.state = 'repairing_barrel';
+              s.repairTimer = 0;
+            }
+          }
+        }
+
+        // --- 修復砲管 HP（修理兵）---
+        else if (s.state === 'repairing_barrel') {
+          s.repairTimer += dt;
+
+          // 修復粒子（藍色）
+          if (Math.random() < 0.1) {
+            var origin = G.getBarrelOrigin();
+            state.particles.push({
+              x: origin.x + (Math.random() - 0.5) * 12,
+              y: origin.y + (Math.random() - 0.5) * 12,
+              vx: (Math.random() - 0.5) * 1.5, vy: -Math.random() * 1.5,
+              life: 8 + Math.random() * 8, maxLife: 16,
+              color: '#0af', size: 1 + Math.random(),
+            });
+          }
+
+          if (s.repairTimer >= BRIDGE_TIME) {
+            s.repairTimer = 0;
+            if (state.barrelHP < CFG.BARREL_MAX_HP) {
+              state.barrelHP++;
+            }
+            // 檢查是否還需要修
+            if (state.barrelHP >= CFG.BARREL_MAX_HP) {
+              // 回頭檢查方塊
+              s.repairTarget = findRepairTarget();
+              if (s.repairTarget) { s.state = 'repairing'; s.repairTimer = 0; }
+              else { s.state = 'idle'; }
+            }
           }
         }
 
@@ -424,7 +460,7 @@
         ctx.fillRect(sx + 1, sy - 2, 2, 3 - legOff);
 
         // 兵種特殊配件
-        if (s.state === 'repairing') {
+        if (s.state === 'repairing' || s.state === 'repairing_barrel') {
           var rb = Math.sin(s.walkFrame * 6) * 2;
           ctx.fillStyle = '#aaa';
           ctx.fillRect(sx + 4 * s.direction, sy - 9 + rb, 3, 1);

@@ -39,6 +39,7 @@
     G.plugins.hud,
     G.plugins.airdrop,
     G.plugins.airship,
+    G.plugins.fighter,
     G.plugins.kaiju,
     G.plugins.slider,
   ]);
