@@ -55,7 +55,7 @@
         var m = state.missiles[i];
         if (!m.alive) { state.missiles.splice(i, 1); continue; }
 
-        m.vy += CFG.MISSILE_GRAVITY;
+        if (m.type !== 'flame') m.vy += CFG.MISSILE_GRAVITY;
         m.x += m.vx;
         m.y += m.vy;
 
@@ -78,7 +78,9 @@
         for (j = 0; j < m.trail.length; j++) {
           t = m.trail[j];
           var ta = (t.life / 18) * 0.5;
-          if (m.type === 'bomb') {
+          if (m.type === 'flame') {
+            ctx.fillStyle = 'rgba(255,120,20,' + ta + ')';
+          } else if (m.type === 'bomb') {
             ctx.fillStyle = 'rgba(100,100,100,' + ta + ')';
           } else {
             ctx.fillStyle = 'rgba(255,80,20,' + ta + ')';
@@ -92,8 +94,17 @@
         m = state.missiles[i];
         if (!m.alive) continue;
 
-        if (m.type === 'bomb') {
-          // 炸彈：圓形 + 引信
+        if (m.type === 'flame') {
+          // 火焰球
+          var flx = Math.floor(m.x), fly = Math.floor(m.y);
+          ctx.fillStyle = 'rgba(255,150,30,0.35)';
+          ctx.beginPath(); ctx.arc(flx, fly, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#fa0';
+          ctx.beginPath(); ctx.arc(flx, fly, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ff6';
+          ctx.beginPath(); ctx.arc(flx, fly, 2, 0, Math.PI * 2); ctx.fill();
+        } else if (m.type === 'bomb') {
+          // 炸彈
           var bx = Math.floor(m.x), by = Math.floor(m.y);
           ctx.fillStyle = '#333';
           ctx.beginPath(); ctx.arc(bx, by, 4, 0, Math.PI * 2); ctx.fill();

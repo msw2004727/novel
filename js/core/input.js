@@ -5,13 +5,16 @@
   G.initInput = function() {
     var canvas = document.getElementById('game');
 
-    // 全域手勢鎖定（Safari/Chrome/LINE 瀏覽器雙指縮放、下拉刷新）
+    // 全域手勢鎖定（Safari/Chrome/LINE：縮放、長按、下拉刷新）
     document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
     document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
     document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
     document.addEventListener('touchmove', function(e) {
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
+    // 長按選單鎖定
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    document.addEventListener('selectstart', function(e) { e.preventDefault(); });
 
     // 點擊畫布：暫停中則恢復遊戲
     canvas.addEventListener('mousedown', function() {

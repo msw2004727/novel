@@ -78,14 +78,14 @@
         }
       }
 
-      // 子彈 vs 飛艇
+      // 子彈 vs 飛艇 / 怪獸
       for (bi = state.bullets.length - 1; bi >= 0; bi--) {
         b = state.bullets[bi];
         if (b.life <= 0) continue;
         if (G.checkAirshipHit && G.checkAirshipHit(b.x, b.y)) {
-          b.life = 0;
-          state.kills++;
-          G.playSound('hit');
+          b.life = 0; state.kills++; G.playSound('hit');
+        } else if (b.life > 0 && G.checkKaijuHit && G.checkKaijuHit(b.x, b.y)) {
+          b.life = 0; state.kills++; G.playSound('hit');
         }
       }
 

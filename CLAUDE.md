@@ -1,34 +1,38 @@
-# 砲管守護者 - Barrel Defender
+# 防空保衛戰 - Air Defense
 
-HTML5 Canvas 砲台防禦遊戲。玩家控制砲台攔截拋物線導彈，砲台由方塊組成，可被炸毀崩塌，砲管全毀則 Game Over。
+HTML5 Canvas 塔防遊戲。玩家控制砲台攔截導彈、飛艇炸彈、怪獸火焰。砲管 HP 歸零或砲台方塊全毀則 Game Over。
 
 ## 架構
 
-採用 IIFE + 全域命名空間 `Game` 的插件式架構，支援 `file://` 直接開啟。
+IIFE + 全域命名空間 `Game` 插件式架構，支援 `file://` 直接開啟。
 
 ```
-index.html                  → 入口（僅 HTML 結構 + script 標籤）
+index.html                  → 入口 HTML + script 標籤
 barrel_defender.html        → 原始單檔版（備份）
 css/style.css               → 所有樣式
 js/
   config.js                 → 遊戲常數 (Game.CFG)
   state.js                  → 全域可變狀態 (Game.state)
-  main.js                   → 註冊插件、啟動引擎、startGame()
+  main.js                   → 插件註冊、暱稱、排行榜、暫停
   core/
-    engine.js               → 插件引擎：生命週期 init/update/draw
-    canvas.js               → Canvas 初始化與自適應縮放
-    input.js                → 滑鼠/觸控輸入
+    engine.js               → 插件引擎（update 按註冊序，draw 按 drawOrder）
+    canvas.js               → Canvas 初始化與縮放
+    input.js                → 滑鼠/觸控/手勢鎖定
     audio.js                → Web Audio 音效
   plugins/
-    background.js           → drawOrder:0  星空、城市剪影
-    terrain.js              → drawOrder:10 地形格狀系統
-    turret.js               → drawOrder:20 砲台方塊 + 砲管 + 重力崩塌
-    bullet.js               → drawOrder:30 子彈發射與飛行
-    missile.js              → drawOrder:35 導彈生成與拋物線
+    background.js           → drawOrder:0  日夜循環、星空、月亮/太陽、飛鳥、城市
+    airship.js              → drawOrder:5  飛艇系統（方塊組裝、投彈、擊落）
+    kaiju.js                → drawOrder:8  怪獸系統（方塊恐龍、吐火、頭部弱點）
+    terrain.js              → drawOrder:10 地形破壞系統
+    turret.js               → drawOrder:20 砲台方塊 + 砲管 HP + 重力崩塌
+    airdrop.js              → drawOrder:25 空投/地面增援、三兵種、搭橋、難度系統
+    bullet.js               → drawOrder:30 子彈（含加速/散彈增益）
+    missile.js              → drawOrder:35 導彈/炸彈/火焰
     effects.js              → drawOrder:40 粒子、爆炸、螢幕震動
-    collision.js            → 無繪製      碰撞偵測 + Game Over 判定
-    wave.js                 → 無繪製      波次計時與遞增
-    hud.js                  → drawOrder:50 準心、HUD 數值、警告
+    collision.js            → 無繪製      所有碰撞偵測 + Game Over
+    wave.js                 → 無繪製      波次計時
+    hud.js                  → drawOrder:50 HUD 卡片、砲管 HP 條、準心
+    slider.js               → 無繪製      觸控瞄準拖曳條
 ```
 
 ## 插件介面
@@ -38,17 +42,13 @@ js/
   'use strict';
   G.plugins.myPlugin = {
     name: 'myPlugin',
-    drawOrder: 0,                    // 繪製層序
-    init: function() {},             // 遊戲開始/重置
-    update: function(dt) {},         // 每幀邏輯（僅 playing 狀態）
-    draw: function(ctx, now) {},     // 每幀繪製（依 drawOrder 排序）
+    drawOrder: 0,
+    init: function() {},
+    update: function(dt) {},
+    draw: function(ctx, now) {},
   };
 })(Game);
 ```
-
-- 公開 API 掛 `Game.*`（如 `Game.playSound`、`Game.createExplosion`）
-- 私有邏輯留在 IIFE 閉包內
-- `main.js` 的 `registerAll` 順序決定 update 執行順序
 
 ## 新增插件步驟
 
@@ -64,20 +64,36 @@ js/
 | `Game.CFG` | config.js | 所有遊戲常數 |
 | `Game.state` | state.js | 全部可變狀態 |
 | `Game.resetState()` | state.js | 重置狀態 |
-| `Game.playSound(type)` | audio.js | 播放音效 (shoot/explode/hit/turret_hit) |
-| `Game.isBarrelAlive()` | turret.js | 砲管是否存活 |
-| `Game.getBarrelOrigin()` | turret.js | 砲管原點座標 |
-| `Game.destroyTerrain(x,y,r)` | terrain.js | 爆炸破壞地形 |
-| `Game.destroyTurretBlocks(x,y,r)` | turret.js | 爆炸破壞砲台 |
-| `Game.createExplosion(x,y)` | effects.js | 建立爆炸（含粒子+破壞） |
-| `Game.checkTerrainHit(x,y)` | terrain.js | 檢查地形碰撞 |
-| `Game.checkTurretHit(x,y)` | turret.js | 檢查砲台碰撞 |
-| `Game.countAliveBlocks()` | turret.js | 回傳 {alive, total} |
+| `Game.playSound(type)` | audio.js | 播放音效 |
+| `Game.isBarrelAlive()` | turret.js | 砲管 HP > 0 |
+| `Game.createExplosion(x,y)` | effects.js | 爆炸 + 破壞 |
+| `Game.checkAirshipHit(x,y)` | airship.js | 子彈碰飛艇 |
+| `Game.checkKaijuHit(x,y)` | kaiju.js | 子彈碰怪獸 |
+| `Game.getDifficultyBonus()` | airdrop.js | 小兵數量難度加成 |
+| `Game.countBoostingSoldiers(type)` | airdrop.js | 增益中兵種數 |
+| `Game.countAliveSoldiers()` | airdrop.js | 各兵種存活數 |
+| `Game.saveScore()` | main.js | 儲存分數到 localStorage + jsonbin |
+
+## 遊戲系統
+
+### 動態難度
+- 每 10 個存活小兵 = 導彈/飛艇/怪獸 +10% 強度
+- 小兵死亡即時降低難度
+- 小兵上限 100
+
+### 導彈類型 (state.missiles)
+- 無 type：一般拋物線導彈（受重力）
+- `type:'bomb'`：飛艇投下的炸彈（受重力，灰色煙軌）
+- `type:'flame'`：怪獸火焰（不受重力，橘色火軌）
+
+### 排行榜
+- localStorage 本地 + jsonbin.io 雲端雙寫
+- 顯示時優先雲端，失敗回退本地
 
 ## 規範
 
-- 唯一全域變數：`Game` 和 `window.startGame`
-- 常數全大寫底線、函式 camelCase、檔案小寫英文、CSS kebab-case
-- 修改前先讀檔，不加非必要功能，不改未動的程式碼
-- 實體陣列（bullets/missiles/particles/explosions）一律存 `Game.state`
-- 繪製函式接收 `ctx`，更新函式接收 `dt`（毫秒差值）
+- 全域變數：`Game`、`window.startGame`、`window.togglePause`、`window.showLeaderboard`
+- 常數全大寫底線、函式 camelCase、檔案小寫英文
+- 手勢鎖定：縮放/長按/選取/右鍵全鎖（Safari/Chrome/LINE）
+- 實體陣列一律存 `Game.state`
+- 繪製接收 `ctx`，更新接收 `dt`（毫秒差值，已夾限 50ms）

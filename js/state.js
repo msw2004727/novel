@@ -38,6 +38,8 @@
     airships: [],
     airshipTimer: 0,
     groundSoldierTimer: 0,
+    kaijus: [],
+    kaijuTimer: 0,
   };
 
   G.resetState = function() {
@@ -73,5 +75,7 @@
     s.airships = [];
     s.airshipTimer = 0;
     s.groundSoldierTimer = 0;
+    s.kaijus = [];
+    s.kaijuTimer = 0;
   };
 })(Game);

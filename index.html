@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>砲管守衛者 - Barrel Defender</title>
+<title>防空保衛戰 - Air Defense</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -55,7 +55,7 @@
 </div>
 
 <div id="start-screen">
-  <h1>砲管守衛者</h1>
+  <h1>防空保衛戰</h1>
   <div class="intro">
     <div class="intro-section">
       <div class="intro-title">操作</div>
@@ -81,6 +81,12 @@
       <div class="intro-title">飛艇</div>
       <p>每 60 秒出現，投下炸彈，打掉關鍵部位可擊落</p>
       <p>擊落後墜地爆炸，生成大量小兵支援！</p>
+    </div>
+    <div class="intro-section">
+      <div class="intro-title">怪獸</div>
+      <p>每 90 秒出現方塊組成的巨型怪獸</p>
+      <p>會從嘴巴吐出火焰，<b style="color:#f44">弱點是頭部</b></p>
+      <p>打掉頭部整隻崩塌！火焰可在空中擊落</p>
     </div>
   </div>
   <div id="name-row">
@@ -124,6 +130,7 @@
 <script src="js/plugins/hud.js"></script>
 <script src="js/plugins/airdrop.js"></script>
 <script src="js/plugins/airship.js"></script>
+<script src="js/plugins/kaiju.js"></script>
 <script src="js/plugins/slider.js"></script>
 
 <!-- 入口：組裝並啟動 -->
